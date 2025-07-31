@@ -25,6 +25,7 @@ interface SelectionMetadata {
   selectedPages: number[];
   startPage: number;
   endPage: number;
+  userInteractedPages: Set<number>; // Track which pages user has manually interacted with
 }
 
 const Table = () => {
@@ -42,16 +43,13 @@ const Table = () => {
       selectedPages: [],
       startPage: 1,
       endPage: 1,
+      userInteractedPages: new Set<number>(),
     }
   );
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(true);
   const op = useRef<OverlayPanel>(null);
 
-  /**
-   * Calculate how many rows should be selected on each page
-   * Returns an array where each index represents rows to select on that page
-   */
   const calculateSelectedPages = (
     totalRows: number,
     rowsPerPage: number
@@ -65,7 +63,7 @@ const Table = () => {
       result.push(rowsPerPage);
     }
 
-    // Last page gets remaining rows (if any)
+    // Last page gets remaining rows
     if (remainingRows > 0) {
       result.push(remainingRows);
     }
@@ -73,13 +71,9 @@ const Table = () => {
     return result;
   };
 
-  /**
-   * Get the number of rows that should be selected on a specific page
-   */
   const getRowsToSelectOnPage = (pageNumber: number): number => {
     if (!selectionMetadata.isActive) return 0;
 
-    // Check if page is within selection range
     if (
       pageNumber < selectionMetadata.startPage ||
       pageNumber > selectionMetadata.endPage
@@ -91,9 +85,6 @@ const Table = () => {
     return selectionMetadata.selectedPages[pageIndex] || 0;
   };
 
-  /**
-   * Check if automatic selection should happen on current page
-   */
   const shouldAutoSelectOnCurrentPage = (): boolean => {
     return (
       selectionMetadata.isActive &&
@@ -103,8 +94,6 @@ const Table = () => {
       selectionMetadata.currentPage <= selectionMetadata.endPage
     );
   };
-
-  // ============ DATA FETCHING ============
 
   const fetchData = async (page: number = 1) => {
     try {
@@ -122,11 +111,6 @@ const Table = () => {
     }
   };
 
-  // ============ AUTOMATIC SELECTION LOGIC ============
-
-  /**
-   * Automatically select rows on the current page based on selection metadata
-   */
   const processAutoSelection = () => {
     if (!shouldAutoSelectOnCurrentPage() || artworks.length === 0) {
       return;
@@ -140,13 +124,20 @@ const Table = () => {
       return;
     }
 
+    // Check if user has already manually interacted with this page
+    if (
+      selectionMetadata.userInteractedPages.has(selectionMetadata.currentPage)
+    ) {
+      return;
+    }
+
     // Get IDs of rows that should be selected on this page
-    const currentPageRowIds = artworks
+    const currentPageRowIdsToSelect = artworks
       .slice(0, rowsToSelectOnThisPage)
       .map((artwork) => artwork.id);
 
     // Filter out IDs that are already selected
-    const newSelections = currentPageRowIds.filter(
+    const newSelections = currentPageRowIdsToSelect.filter(
       (id) => !selectionMetadata.selectedIds.includes(id)
     );
 
@@ -154,7 +145,7 @@ const Table = () => {
       const newTotalSelected =
         selectionMetadata.selectedIds.length + newSelections.length;
 
-      // Automatically deactivate when target is reached or exceeded
+      // deactivate when target is reached or exceeded
       const isStillActive =
         newTotalSelected < selectionMetadata.totalRowsToSelect;
 
@@ -162,12 +153,10 @@ const Table = () => {
         ...prev,
         selectedIds: [...prev.selectedIds, ...newSelections],
         rowsSelectedSoFar: newTotalSelected,
-        isActive: isStillActive, // Auto-deactivate when target reached
+        isActive: isStillActive,
       }));
     }
   };
-
-  // ============ EVENT HANDLERS ============
 
   const onPageChange = (e: { first: number; rows: number; page: number }) => {
     setFirst(e.first);
@@ -204,6 +193,7 @@ const Table = () => {
       selectedPages: selectedPagesArray,
       startPage: startPage,
       endPage: endPage,
+      userInteractedPages: new Set<number>(),
     };
 
     setSelectionMetadata(newMetadata);
@@ -211,26 +201,29 @@ const Table = () => {
     op.current?.hide();
   };
 
-  /**
-   * Handle manual selection/deselection by user
-   * Ensures persistence across all pages
-   */
   const onSelectionChange = (e: { value: Artwork[] }) => {
     const selectedArtworks = e.value;
     const currentPageSelectedIds = selectedArtworks.map(
       (artwork) => artwork.id
     );
 
+    // Get IDs of all rows currently visible on this page
+    const currentPageRowIds = artworks.map((artwork) => artwork.id);
+
     // Keep selections from other pages (persistence)
     const otherPageSelectedIds = selectionMetadata.selectedIds.filter(
-      (id) => !artworks.some((artwork) => artwork.id === id)
+      (id) => !currentPageRowIds.includes(id)
     );
 
-    // Combine selections from other pages with current page selections
     const allSelectedIds = [...otherPageSelectedIds, ...currentPageSelectedIds];
 
-    // Check deactivation conditions
+    //  user-interacted page
     const currentPageNumber = Math.floor(first / rows) + 1;
+    const newUserInteractedPages = new Set(
+      selectionMetadata.userInteractedPages
+    );
+    newUserInteractedPages.add(currentPageNumber);
+
     const hasCompletedAllPages = currentPageNumber > selectionMetadata.endPage;
     const hasReachedTargetRows =
       allSelectedIds.length >= selectionMetadata.totalRowsToSelect;
@@ -244,17 +237,11 @@ const Table = () => {
       ...prev,
       selectedIds: allSelectedIds, // Always maintain all selections
       rowsSelectedSoFar: allSelectedIds.length,
-      // Deactivate when conditions are met, otherwise preserve current state
+      userInteractedPages: newUserInteractedPages,
       isActive: shouldDeactivate ? false : prev.isActive,
     }));
   };
 
-  // ============ PERSISTENCE LOGIC ============
-
-  /**
-   * Update selectedRows state when artworks or selectedIds change
-   * This ensures the DataTable shows the correct selections
-   */
   const updateSelectedRows = () => {
     const selectedArtworks = artworks.filter((artwork) =>
       selectionMetadata.selectedIds.includes(artwork.id)
@@ -266,10 +253,11 @@ const Table = () => {
    * Save selection metadata to localStorage
    */
   const saveToLocalStorage = () => {
-    localStorage.setItem(
-      "selectionMetadata",
-      JSON.stringify(selectionMetadata)
-    );
+    const metadataToSave = {
+      ...selectionMetadata,
+      userInteractedPages: Array.from(selectionMetadata.userInteractedPages), // Convert Set to Array
+    };
+    localStorage.setItem("selectionMetadata", JSON.stringify(metadataToSave));
   };
 
   /**
@@ -280,14 +268,17 @@ const Table = () => {
       const savedMetadata = localStorage.getItem("selectionMetadata");
       if (savedMetadata) {
         const metadata = JSON.parse(savedMetadata);
+        if (metadata.userInteractedPages) {
+          metadata.userInteractedPages = new Set(metadata.userInteractedPages);
+        } else {
+          metadata.userInteractedPages = new Set<number>();
+        }
         setSelectionMetadata(metadata);
       }
     } catch (error) {
       console.error("Error loading from localStorage:", error);
     }
   };
-
-  // ============ EFFECTS ============
 
   // Initial data fetch
   useEffect(() => {
@@ -304,7 +295,6 @@ const Table = () => {
     saveToLocalStorage();
   }, [selectionMetadata]);
 
-  // Update selected rows when artworks or selectedIds change
   useEffect(() => {
     updateSelectedRows();
   }, [artworks, selectionMetadata.selectedIds]);
@@ -320,8 +310,6 @@ const Table = () => {
     artworks,
     loading,
   ]);
-
-  // ============ UI COMPONENTS ============
 
   const overlayButton = () => {
     return (
