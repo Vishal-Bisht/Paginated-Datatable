@@ -197,6 +197,17 @@ body {
 .overlay-panel input {
   width: 200px;
   height: 30px;
+  padding: 8px 12px;
+  margin-bottom: 3px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  outline: none;
+  font-size: 0.9rem;
+}
+
+.overlay-panel input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
 .overlay-panel button {
