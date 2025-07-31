@@ -15,7 +15,9 @@ body {
 /* Container styles */
 .table-container {
   max-width: 100%;
-  height: calc(100vh - 100px);
+  height: calc(100vh - 10px);
+  display: flex;
+  flex-direction: column;
 }
 
 .p-checkbox .p-checkbox-input {
@@ -25,9 +27,14 @@ body {
   height: 20px;
 }
 
+.p-checkbox-icon {
+  display: none;
+}
+
 .data-table {
   border: none;
-  height: 100%;
+  flex: 1;
+  overflow: auto;
 }
 
 .data-table ::-webkit-scrollbar {
