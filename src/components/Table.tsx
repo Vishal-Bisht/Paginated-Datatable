@@ -22,6 +22,9 @@ interface SelectionMetadata {
   rowsSelectedSoFar: number;
   isActive: boolean;
   currentPage: number;
+  selectedPages: number[];
+  startPage: number;
+  endPage: number;
 }
 
 const Table = () => {
@@ -36,37 +39,72 @@ const Table = () => {
       rowsSelectedSoFar: 0,
       isActive: false,
       currentPage: 1,
+      selectedPages: [],
+      startPage: 1,
+      endPage: 1,
     }
   );
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(true);
   const op = useRef<OverlayPanel>(null);
 
-  // Initialize from localStorage
-  useEffect(() => {
-    const savedMetadata = localStorage.getItem("selectionMetadata");
-    if (savedMetadata) {
-      const metadata = JSON.parse(savedMetadata);
-      setSelectionMetadata(metadata);
-      // Map selectedIds to Artwork objects for DataTable
-      setSelectedRows(
-        artworks.filter((artwork) => metadata.selectedIds.includes(artwork.id))
-      );
-    }
-  }, []);
+  /**
+   * Calculate how many rows should be selected on each page
+   * Returns an array where each index represents rows to select on that page
+   */
+  const calculateSelectedPages = (
+    totalRows: number,
+    rowsPerPage: number
+  ): number[] => {
+    const fullPages = Math.floor(totalRows / rowsPerPage);
+    const remainingRows = totalRows % rowsPerPage;
+    const result: number[] = [];
 
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem(
-      "selectionMetadata",
-      JSON.stringify(selectionMetadata)
+    // Full pages get all rows selected
+    for (let i = 0; i < fullPages; i++) {
+      result.push(rowsPerPage);
+    }
+
+    // Last page gets remaining rows (if any)
+    if (remainingRows > 0) {
+      result.push(remainingRows);
+    }
+
+    return result;
+  };
+
+  /**
+   * Get the number of rows that should be selected on a specific page
+   */
+  const getRowsToSelectOnPage = (pageNumber: number): number => {
+    if (!selectionMetadata.isActive) return 0;
+
+    // Check if page is within selection range
+    if (
+      pageNumber < selectionMetadata.startPage ||
+      pageNumber > selectionMetadata.endPage
+    ) {
+      return 0;
+    }
+
+    const pageIndex = pageNumber - selectionMetadata.startPage;
+    return selectionMetadata.selectedPages[pageIndex] || 0;
+  };
+
+  /**
+   * Check if automatic selection should happen on current page
+   */
+  const shouldAutoSelectOnCurrentPage = (): boolean => {
+    return (
+      selectionMetadata.isActive &&
+      selectionMetadata.rowsSelectedSoFar <
+        selectionMetadata.totalRowsToSelect &&
+      selectionMetadata.currentPage >= selectionMetadata.startPage &&
+      selectionMetadata.currentPage <= selectionMetadata.endPage
     );
-    setSelectedRows(
-      artworks.filter((artwork) =>
-        selectionMetadata.selectedIds.includes(artwork.id)
-      )
-    );
-  }, [selectionMetadata, artworks]);
+  };
+
+  // ============ DATA FETCHING ============
 
   const fetchData = async (page: number = 1) => {
     try {
@@ -78,73 +116,94 @@ const Table = () => {
       setArtworks(data.data || []);
     } catch (error) {
       console.error("Error fetching data:", error);
+      setArtworks([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Initial fetch
-  useEffect(() => {
-    fetchData(1);
-  }, []);
+  // ============ AUTOMATIC SELECTION LOGIC ============
 
-  const onPageChange = (e: { first: number; rows: number; page: number }) => {
-    setFirst(e.first);
-    const currentPage = e.page + 1;
-    setSelectionMetadata((prev) => ({
-      ...prev,
-      currentPage,
-    }));
-    fetchData(currentPage);
-  };
-
-  // Process selections on the current page
-  const processCurrentPageSelection = () => {
-    if (
-      !selectionMetadata.isActive ||
-      selectionMetadata.rowsSelectedSoFar >= selectionMetadata.totalRowsToSelect
-    ) {
+  /**
+   * Automatically select rows on the current page based on selection metadata
+   */
+  const processAutoSelection = () => {
+    if (!shouldAutoSelectOnCurrentPage() || artworks.length === 0) {
       return;
     }
 
-    const remainingToSelect =
-      selectionMetadata.totalRowsToSelect - selectionMetadata.rowsSelectedSoFar;
-    const availableRows = artworks.length;
-    const rowsToSelectOnThisPage = Math.min(remainingToSelect, availableRows);
+    const rowsToSelectOnThisPage = getRowsToSelectOnPage(
+      selectionMetadata.currentPage
+    );
 
-    if (rowsToSelectOnThisPage > 0) {
-      const newSelections = artworks
-        .slice(0, rowsToSelectOnThisPage)
-        .map((artwork) => artwork.id)
-        .filter((id) => !selectionMetadata.selectedIds.includes(id)); // Avoid duplicates
+    if (rowsToSelectOnThisPage === 0) {
+      return;
+    }
+
+    // Get IDs of rows that should be selected on this page
+    const currentPageRowIds = artworks
+      .slice(0, rowsToSelectOnThisPage)
+      .map((artwork) => artwork.id);
+
+    // Filter out IDs that are already selected
+    const newSelections = currentPageRowIds.filter(
+      (id) => !selectionMetadata.selectedIds.includes(id)
+    );
+
+    if (newSelections.length > 0) {
+      const newTotalSelected =
+        selectionMetadata.selectedIds.length + newSelections.length;
+
+      // Automatically deactivate when target is reached or exceeded
+      const isStillActive =
+        newTotalSelected < selectionMetadata.totalRowsToSelect;
 
       setSelectionMetadata((prev) => ({
         ...prev,
         selectedIds: [...prev.selectedIds, ...newSelections],
-        rowsSelectedSoFar: prev.rowsSelectedSoFar + newSelections.length,
-        isActive:
-          prev.rowsSelectedSoFar + newSelections.length <
-          prev.totalRowsToSelect,
+        rowsSelectedSoFar: newTotalSelected,
+        isActive: isStillActive, // Auto-deactivate when target reached
       }));
     }
   };
 
-  // Handle input submission
+  // ============ EVENT HANDLERS ============
+
+  const onPageChange = (e: { first: number; rows: number; page: number }) => {
+    setFirst(e.first);
+    const newCurrentPage = Math.floor(e.first / e.rows) + 1;
+
+    setSelectionMetadata((prev) => ({
+      ...prev,
+      currentPage: newCurrentPage,
+    }));
+
+    fetchData(newCurrentPage);
+  };
+
   const handleSubmit = () => {
     const numberOfRows = parseInt(inputValue);
 
     if (isNaN(numberOfRows) || numberOfRows <= 0) {
-      alert("Please enter a valid number");
+      alert("Please enter a valid number greater than 0");
       return;
     }
 
     const currentPage = Math.floor(first / rows) + 1;
+    const selectedPagesArray = calculateSelectedPages(numberOfRows, rows);
+    const startPage = currentPage;
+    const endPage = startPage + selectedPagesArray.length - 1;
+
+    // Reset selection state and start new selection
     const newMetadata: SelectionMetadata = {
       totalRowsToSelect: numberOfRows,
       selectedIds: [],
       rowsSelectedSoFar: 0,
       isActive: true,
-      currentPage,
+      currentPage: startPage,
+      selectedPages: selectedPagesArray,
+      startPage: startPage,
+      endPage: endPage,
     };
 
     setSelectionMetadata(newMetadata);
@@ -152,34 +211,117 @@ const Table = () => {
     op.current?.hide();
   };
 
-  // automatic selection when artworks or page changes, or when selection becomes active
-  useEffect(() => {
-    if (selectionMetadata.isActive && artworks.length > 0) {
-      processCurrentPageSelection();
-    }
-  }, [artworks, selectionMetadata.currentPage, selectionMetadata.isActive]);
-
+  /**
+   * Handle manual selection/deselection by user
+   * Ensures persistence across all pages
+   */
   const onSelectionChange = (e: { value: Artwork[] }) => {
     const selectedArtworks = e.value;
-    const newSelectedIds = selectedArtworks.map((artwork) => artwork.id);
+    const currentPageSelectedIds = selectedArtworks.map(
+      (artwork) => artwork.id
+    );
 
-    setSelectionMetadata((prev) => {
-      const otherPageIds = prev.selectedIds.filter(
-        (id) => !artworks.some((artwork) => artwork.id === id)
-      );
-      const newRowsSelectedSoFar = Math.min(
-        prev.totalRowsToSelect,
-        otherPageIds.length + newSelectedIds.length
-      );
+    // Keep selections from other pages (persistence)
+    const otherPageSelectedIds = selectionMetadata.selectedIds.filter(
+      (id) => !artworks.some((artwork) => artwork.id === id)
+    );
 
-      return {
-        ...prev,
-        selectedIds: [...otherPageIds, ...newSelectedIds],
-        rowsSelectedSoFar: newRowsSelectedSoFar,
-        isActive: false, // Stop auto-selection on manual change
-      };
-    });
+    // Combine selections from other pages with current page selections
+    const allSelectedIds = [...otherPageSelectedIds, ...currentPageSelectedIds];
+
+    // Check deactivation conditions
+    const currentPageNumber = Math.floor(first / rows) + 1;
+    const hasCompletedAllPages = currentPageNumber > selectionMetadata.endPage;
+    const hasReachedTargetRows =
+      allSelectedIds.length >= selectionMetadata.totalRowsToSelect;
+
+    // Deactivate auto-selection if:
+    // 1. User has completed visiting all required pages, OR
+    // 2. Target number of rows has been reached/exceeded
+    const shouldDeactivate = hasCompletedAllPages || hasReachedTargetRows;
+
+    setSelectionMetadata((prev) => ({
+      ...prev,
+      selectedIds: allSelectedIds, // Always maintain all selections
+      rowsSelectedSoFar: allSelectedIds.length,
+      // Deactivate when conditions are met, otherwise preserve current state
+      isActive: shouldDeactivate ? false : prev.isActive,
+    }));
   };
+
+  // ============ PERSISTENCE LOGIC ============
+
+  /**
+   * Update selectedRows state when artworks or selectedIds change
+   * This ensures the DataTable shows the correct selections
+   */
+  const updateSelectedRows = () => {
+    const selectedArtworks = artworks.filter((artwork) =>
+      selectionMetadata.selectedIds.includes(artwork.id)
+    );
+    setSelectedRows(selectedArtworks);
+  };
+
+  /**
+   * Save selection metadata to localStorage
+   */
+  const saveToLocalStorage = () => {
+    localStorage.setItem(
+      "selectionMetadata",
+      JSON.stringify(selectionMetadata)
+    );
+  };
+
+  /**
+   * Load selection metadata from localStorage
+   */
+  const loadFromLocalStorage = () => {
+    try {
+      const savedMetadata = localStorage.getItem("selectionMetadata");
+      if (savedMetadata) {
+        const metadata = JSON.parse(savedMetadata);
+        setSelectionMetadata(metadata);
+      }
+    } catch (error) {
+      console.error("Error loading from localStorage:", error);
+    }
+  };
+
+  // ============ EFFECTS ============
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchData(1);
+  }, []);
+
+  // Load selection state from localStorage on component mount
+  useEffect(() => {
+    loadFromLocalStorage();
+  }, []);
+
+  // Save to localStorage whenever selection metadata changes
+  useEffect(() => {
+    saveToLocalStorage();
+  }, [selectionMetadata]);
+
+  // Update selected rows when artworks or selectedIds change
+  useEffect(() => {
+    updateSelectedRows();
+  }, [artworks, selectionMetadata.selectedIds]);
+
+  // Process automatic selection when conditions are met
+  useEffect(() => {
+    if (!loading && artworks.length > 0) {
+      processAutoSelection();
+    }
+  }, [
+    selectionMetadata.currentPage,
+    selectionMetadata.isActive,
+    artworks,
+    loading,
+  ]);
+
+  // ============ UI COMPONENTS ============
 
   const overlayButton = () => {
     return (
