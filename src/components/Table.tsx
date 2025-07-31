@@ -183,6 +183,9 @@ const Table = () => {
     const startPage = currentPage;
     const endPage = startPage + selectedPagesArray.length - 1;
 
+    // Clear current selections immediately
+    setSelectedRows([]);
+
     // Reset selection state and start new selection
     const newMetadata: SelectionMetadata = {
       totalRowsToSelect: numberOfRows,
@@ -309,6 +312,23 @@ const Table = () => {
     selectionMetadata.isActive,
     artworks,
     loading,
+  ]);
+
+  //auto-selection immediately when selection metadata is reset
+  useEffect(() => {
+    if (
+      selectionMetadata.isActive &&
+      selectionMetadata.selectedIds.length === 0 &&
+      !loading &&
+      artworks.length > 0
+    ) {
+      processAutoSelection();
+    }
+  }, [
+    selectionMetadata.isActive,
+    selectionMetadata.selectedIds.length,
+    loading,
+    artworks,
   ]);
 
   const overlayButton = () => {
