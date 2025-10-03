@@ -63,7 +63,7 @@ const Table = () => {
       result.push(rowsPerPage);
     }
 
-    // Last page gets remaining rows
+    // remaining rows
     if (remainingRows > 0) {
       result.push(remainingRows);
     }
@@ -124,7 +124,7 @@ const Table = () => {
       return;
     }
 
-    // Check if user has already manually interacted with this page
+    // if user has already manually interacted with this page
     if (
       selectionMetadata.userInteractedPages.has(selectionMetadata.currentPage)
     ) {
@@ -231,14 +231,12 @@ const Table = () => {
     const hasReachedTargetRows =
       allSelectedIds.length >= selectionMetadata.totalRowsToSelect;
 
-    // Deactivate auto-selection if:
-    // 1. User has completed visiting all required pages, OR
-    // 2. Target number of rows has been reached/exceeded
+    // deactivate the auto select
     const shouldDeactivate = hasCompletedAllPages || hasReachedTargetRows;
 
     setSelectionMetadata((prev) => ({
       ...prev,
-      selectedIds: allSelectedIds, // Always maintain all selections
+      selectedIds: allSelectedIds, // maintain all selections
       rowsSelectedSoFar: allSelectedIds.length,
       userInteractedPages: newUserInteractedPages,
       isActive: shouldDeactivate ? false : prev.isActive,
@@ -252,9 +250,7 @@ const Table = () => {
     setSelectedRows(selectedArtworks);
   };
 
-  /**
-   * Save selection metadata to localStorage
-   */
+  // Save selection metadata to localStorage
   const saveToLocalStorage = () => {
     const metadataToSave = {
       ...selectionMetadata,
@@ -263,9 +259,8 @@ const Table = () => {
     localStorage.setItem("selectionMetadata", JSON.stringify(metadataToSave));
   };
 
-  /**
-   * Load selection metadata from localStorage
-   */
+  // Load selection metadata from localStorage
+
   const loadFromLocalStorage = () => {
     try {
       const savedMetadata = localStorage.getItem("selectionMetadata");
@@ -302,7 +297,7 @@ const Table = () => {
     updateSelectedRows();
   }, [artworks, selectionMetadata.selectedIds]);
 
-  // Process automatic selection when conditions are met
+  // Process automatic selection
   useEffect(() => {
     if (!loading && artworks.length > 0) {
       processAutoSelection();
@@ -314,7 +309,7 @@ const Table = () => {
     loading,
   ]);
 
-  //auto-selection immediately when selection metadata is reset
+  //auto-selection
   useEffect(() => {
     if (
       selectionMetadata.isActive &&
