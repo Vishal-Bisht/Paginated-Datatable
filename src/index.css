@@ -1,0 +1,217 @@
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: sans-serif;
+  background-color: #f5f7fa;
+  color: #333;
+  line-height: 1.6;
+}
+
+/* Container styles */
+.table-container {
+  max-width: 100%;
+  height: calc(100vh - 10px);
+  display: flex;
+  flex-direction: column;
+}
+
+.p-checkbox .p-checkbox-input {
+  display: flex;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.p-checkbox-icon {
+  display: none;
+}
+
+.data-table {
+  border: none;
+  flex: 1;
+  overflow: auto;
+}
+
+.data-table ::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+.data-table .p-datatable-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 1rem;
+  font-weight: 600;
+}
+
+.data-table .p-datatable-thead > tr > th {
+  background-color: #bebebe;
+  border: none;
+  border-bottom: 2px solid #e9ecef;
+  padding: 1rem;
+  font-weight: 600;
+  color: #495057;
+  font-size: 1rem;
+  letter-spacing: 0.5px;
+}
+
+.data-table .p-datatable-tbody > tr > td {
+  padding: 1rem;
+  border: none;
+  border-bottom: 1px solid #e9ecef;
+  vertical-align: top;
+}
+
+/* Paginator styles */
+.p-paginator {
+  background: white;
+  border: none;
+  border-top: 1px solid #e9ecef;
+  padding: 1.5rem;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.p-paginator .p-paginator-pages .p-paginator-page {
+  background: transparent;
+  border: 1px solid #dee2e6;
+  color: #6c757d;
+  margin: 0 3px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.p-paginator .p-paginator-pages .p-paginator-page:hover {
+  background: #e9ecef;
+}
+
+.p-paginator .p-paginator-pages .p-paginator-page.p-highlight {
+  background: rgb(91, 181, 255);
+  border-color: rgb(91, 181, 255);
+  color: white;
+}
+
+.p-paginator .p-paginator-first,
+.p-paginator .p-paginator-prev,
+.p-paginator .p-paginator-next,
+.p-paginator .p-paginator-last {
+  background: transparent;
+  border: 1px solid #dee2e6;
+  color: #6c757d;
+  border-radius: 8px;
+  margin: 0 3px;
+  transition: all 0.3s ease;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1rem;
+}
+
+.p-paginator .p-paginator-first:hover,
+.p-paginator .p-paginator-prev:hover,
+.p-paginator .p-paginator-next:hover,
+.p-paginator .p-paginator-last:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  #root {
+    padding: 10px;
+  }
+
+  .table-container {
+    border-radius: 8px;
+  }
+
+  .data-table .p-datatable-thead > tr > th,
+  .data-table .p-datatable-tbody > tr > td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .p-paginator {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .data-table .p-datatable-thead > tr > th,
+  .data-table .p-datatable-tbody > tr > td {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.8rem;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.header-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chevron-button {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.overlay-panel {
+  height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background-color: #eaebec;
+  border-radius: 8px;
+  padding: 1px 3px;
+}
+
+.overlay-panel input {
+  width: 200px;
+  height: 30px;
+  padding: 8px 12px;
+  margin-bottom: 3px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  outline: none;
+  font-size: 0.9rem;
+}
+
+.overlay-panel input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.overlay-panel button {
+  width: 80px;
+  height: 30px;
+  align-self: flex-end;
+}
